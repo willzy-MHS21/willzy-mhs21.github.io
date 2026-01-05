@@ -12,6 +12,9 @@
             class="border-4 border-white/30 rounded-xl p-2 bg-gradient-to-br from-white/10 to-white/5"
         >
             <form id="contactForm" class="p-6 rounded-lg shadow-2xl">
+                <!-- Hidden access key field -->
+                <input type="hidden" name="access_key" value={import.meta.env.PUBLIC_WEB3FORMS_KEY} />
+
                 <div class="mb-6">
                     <label for="name" class="block mb-2 text-white font-medium"
                         >Name *</label
@@ -72,9 +75,9 @@
                     ></textarea>
                 </div>
 
-                <!-- hCaptcha Widget -->
+                <!-- hCaptcha Widget with Web3Forms site key -->
                 <div class="mb-6 flex justify-center">
-                    <div class="h-captcha" data-sitekey={import.meta.env.PUBLIC_HCAPTCHA_SITE_KEY}></div>
+                    <div class="h-captcha" data-sitekey="50b2fe65-b00b-4b9e-ad62-3ba471098be2"></div>
                 </div>
 
                 <button
@@ -154,8 +157,6 @@
         // Get hCaptcha response token
         const hcaptchaResponse = (document.querySelector('.h-captcha textarea') as HTMLTextAreaElement)?.value;
 
-        console.log("hCaptcha response:", hcaptchaResponse ? "Present" : "Missing");
-
         if (!hcaptchaResponse) {
             formMessage.textContent = "Please complete the CAPTCHA verification.";
             formMessage.className = "mt-4 p-4 rounded-lg text-center font-medium bg-red-100 text-red-800 border border-red-200";
@@ -165,12 +166,9 @@
 
         // Get form data
         const formData = new FormData(form);
-        const data = {
-            name: formData.get("name"),
-            email: formData.get("email"),
-            subject: formData.get("subject"),
-            message: formData.get("message"),
-        };
+        
+        // Add hCaptcha response to form data
+        formData.append("h-captcha-response", hcaptchaResponse);
 
         // Show loading state
         submitBtn.disabled = true;
@@ -178,36 +176,14 @@
         btnLoading.classList.remove("hidden");
         formMessage.classList.add("hidden");
 
-        // Prepare payload
-        const payload = {
-            access_key: import.meta.env.PUBLIC_WEB3FORMS_KEY,
-            name: data.name,
-            email: data.email,
-            subject: data.subject,
-            message: data.message,
-            from_name: data.name,
-            replyto: data.email,
-            "h-captcha-response": hcaptchaResponse,
-        };
-
-        console.log("Submitting to Web3Forms...");
-        console.log("Access key present:", !!payload.access_key);
-        console.log("hCaptcha response present:", !!payload["h-captcha-response"]);
-
         try {
+            // Submit form data to Web3Forms
             const response = await fetch("https://api.web3forms.com/submit", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    Accept: "application/json",
-                },
-                body: JSON.stringify(payload),
+                body: formData
             });
 
             const result = await response.json();
-            
-            console.log("Response status:", response.status);
-            console.log("Response data:", result);
 
             if (result.success) {
                 formMessage.textContent = "Message sent successfully! I'll get back to you soon.";
@@ -218,18 +194,14 @@
                     (window as any).hcaptcha.reset();
                 }
             } else {
-                // Show the actual error message from Web3Forms
-                const errorMsg = result.message || "Failed to send message. Please try again.";
-                formMessage.textContent = `Error: ${errorMsg}`;
+                formMessage.textContent = result.message || "Failed to send message. Please try again.";
                 formMessage.className = "mt-4 p-4 rounded-lg text-center font-medium bg-red-100 text-red-800 border border-red-200";
-                console.error("Web3Forms error:", result);
             }
         } catch (error) {
             formMessage.textContent = "Oops! Something went wrong. Please try again.";
             formMessage.className = "mt-4 p-4 rounded-lg text-center font-medium bg-red-100 text-red-800 border border-red-200";
             console.error("Form submission error:", error);
         } finally {
-            // Reset button state
             submitBtn.disabled = false;
             btnText.classList.remove("hidden");
             btnLoading.classList.add("hidden");
